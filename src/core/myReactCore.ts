@@ -16,7 +16,6 @@ export type FunctionComponent = (props: NodeProps) => VirtualNode;
 let currentComponent: Function | null = null;
 const states: Map<Function, any[]> = new Map();
 const stateSetters: Map<Function, number[]> = new Map();
-let reRenderScheduled = false;
 
 export const MyReact = {
   createElement(
@@ -151,6 +150,7 @@ export function useState<T>(initialValue: T): [T, (newValue: T) => void] {
 
   const stateIndex = componentSetterIds.length;
 
+  // new useState call
   if (stateIndex >= componentStates.length) {
     componentStates.push(initialValue);
   }
@@ -159,24 +159,13 @@ export function useState<T>(initialValue: T): [T, (newValue: T) => void] {
     const currentStates = states.get(component);
     if (currentStates && currentStates[stateIndex] !== newValue) {
       currentStates[stateIndex] = newValue;
-      scheduleRerender();
+    }
+    if (rootContainer && rootElement) {
+      render(rootElement, rootContainer);
     }
   };
 
   componentSetterIds.push(stateIndex);
 
   return [componentStates[stateIndex], setState];
-}
-
-function scheduleRerender() {
-  if (!reRenderScheduled && rootContainer && rootElement) {
-    reRenderScheduled = true;
-
-    setTimeout(() => {
-      if (rootContainer && rootElement) {
-        render(rootElement, rootContainer);
-        reRenderScheduled = false;
-      }
-    }, 0);
-  }
 }
