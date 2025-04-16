@@ -17,6 +17,8 @@ let currentComponent: Function | null = null;
 const states: Map<Function, any[]> = new Map();
 const stateSetters: Map<Function, number[]> = new Map();
 
+let componentToUpdate: Function | null = null;
+
 export const MyReact = {
   createElement(
     type: ElementType,
@@ -62,9 +64,23 @@ export function render(element: VirtualNode, container: HTMLElement) {
   container.appendChild(dom);
 }
 
+function updateComponent(component: Function) {
+  if (!rootContainer || !rootElement) return;
+
+  componentToUpdate = component;
+
+  const newDom = createDom(rootElement);
+
+  componentToUpdate = null;
+
+  rootContainer.innerHTML = "";
+  rootContainer.appendChild(newDom);
+}
+
 function createDom(element: VirtualNode): HTMLElement | Text {
   if (typeof element.type === "function") {
-    currentComponent = element.type;
+    const component = element.type;
+    currentComponent = component;
 
     if (!stateSetters.get(currentComponent)) {
       stateSetters.set(currentComponent, []);
@@ -74,9 +90,15 @@ function createDom(element: VirtualNode): HTMLElement | Text {
       stateSetters.get(currentComponent)!.length = 0;
     }
 
-    const result = (element.type as FunctionComponent)(element.props);
+    const shouldRender =
+      componentToUpdate === null || componentToUpdate === component;
 
+    const result = (element.type as FunctionComponent)(element.props);
     currentComponent = null;
+
+    if (!shouldRender && element.dom) {
+      return element.dom as HTMLElement | Text;
+    }
 
     return createDom(result);
   }
@@ -150,7 +172,6 @@ export function useState<T>(initialValue: T): [T, (newValue: T) => void] {
 
   const stateIndex = componentSetterIds.length;
 
-  // new useState call
   if (stateIndex >= componentStates.length) {
     componentStates.push(initialValue);
   }
@@ -159,9 +180,7 @@ export function useState<T>(initialValue: T): [T, (newValue: T) => void] {
     const currentStates = states.get(component);
     if (currentStates && currentStates[stateIndex] !== newValue) {
       currentStates[stateIndex] = newValue;
-    }
-    if (rootContainer && rootElement) {
-      render(rootElement, rootContainer);
+      updateComponent(component);
     }
   };
 
